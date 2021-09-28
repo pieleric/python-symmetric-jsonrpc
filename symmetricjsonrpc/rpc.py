@@ -23,8 +23,6 @@
 
 """JSON-RPC implementation classes."""
 
-from __future__ import with_statement
-
 import select
 import socket
 import threading
@@ -32,8 +30,8 @@ import time
 import traceback
 import unittest
 
-import dispatcher
-import json
+from . import dispatcher
+from . import json
 
 class ClientConnection(dispatcher.Connection):
     """A connection manager for a connected socket (or similar) that
@@ -71,10 +69,11 @@ class RPCClient(ClientConnection):
                 try:
                     result = self.dispatch_request(subject)
                     error = None
-                except Exception, e:
+                except Exception as e:
                     result = None
                     error = {'type': type(e).__name__,
                              'args': list(e.args)}
+                print(subject)
                 self.parent.respond(result, error, subject['id'])
             elif 'result' in subject or 'error' in subject:
                 assert 'id' in subject
@@ -121,7 +120,7 @@ class RPCClient(ClientConnection):
             with self._recv_waiting[request_id]['condition']:
                 if self._recv_waiting[request_id]['result'] == None:
                     self._recv_waiting[request_id]['condition'].wait(timeout)
-                if self._recv_waiting[request_id]['result'].has_key('error') and self._recv_waiting[request_id]['result']['error'] is not None:
+                if 'error' in self._recv_waiting[request_id]['result'] and self._recv_waiting[request_id]['result']['error'] is not None:
                     exc = Exception(self._recv_waiting[request_id]['result']['error']['message'])
                     raise exc
                 return self._recv_waiting[request_id]['result']['result']
@@ -192,7 +191,7 @@ class TestThreadedEchoServer(dispatcher.ServerConnection):
 class TestPingRPCClient(RPCClient):
     class Request(RPCClient.Request):
         def dispatch_request(self, subject):
-            if debug_tests: print "PingClient: dispatch_request", subject
+            if debug_tests: print("PingClient: dispatch_request", subject)
             assert subject['method'] == "pingping"
             return "pingpong"
 
@@ -201,10 +200,10 @@ class TestPongRPCServer(RPCServer):
         class Thread(RPCServer.InboundConnection.Thread):
             class Request(RPCServer.InboundConnection.Thread.Request):
                 def dispatch_request(self, subject):
-                    if debug_tests: print "TestPongRPCServer: dispatch_request", subject
+                    if debug_tests: print("TestPongRPCServer: dispatch_request", subject)
                     assert subject['method'] == "ping"
                     assert self.parent.request("pingping", wait_for_response=True) == "pingpong"
-                    if debug_tests: print "TestPongRPCServer: back-pong"
+                    if debug_tests: print("TestPongRPCServer: back-pong")
                     return "pong"
 
 class TestPongRPCP2PServer(RPCP2PNode):
@@ -213,13 +212,13 @@ class TestPongRPCP2PServer(RPCP2PNode):
             class Thread(RPCP2PNode.Thread.InboundConnection.Thread):
                 class Request(RPCP2PNode.Thread.InboundConnection.Thread.Request):
                     def dispatch_request(self, subject):
-                        if debug_tests: print "TestPongRPCP2PServer: dispatch_request", subject
+                        if debug_tests: print("TestPongRPCP2PServer: dispatch_request", subject)
                         if subject['method'] == "ping":
                             assert self.parent.request("pingping", wait_for_response=True) == "pingpong"
-                            if debug_tests: print "TestPongRPCServer: back-pong"
+                            if debug_tests: print("TestPongRPCServer: back-pong")
                             return "pong"
                         elif subject['method'] == "pingping":
-                            if debug_tests: print "PingClient: dispatch_request", subject
+                            if debug_tests: print("PingClient: dispatch_request", subject)
                             return "pingpong"
                         else:
                             assert False
@@ -316,7 +315,7 @@ class TestRpc(unittest.TestCase):
             server_socket = test_make_server_socket()
             res = {}
             server = TestPongRPCP2PServer(server_socket, res, name="PongServer")
-            for x in xrange(0, 4):
+            for x in range(0, 4):
                 if 'result' in res:
                     break
                 time.sleep(1)

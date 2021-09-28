@@ -1,33 +1,30 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 # vim: set fileencoding=UTF-8 :
-
 # python-symmetric-jsonrpc
 # Copyright (C) 2009 Egil Moeller <redhog@redhog.org>
 # Copyright (C) 2009 Nicklas Lindgren <nili@gulmohar.se>
-
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as
 # published by the Free Software Foundation; either version 2 of the
 # License, or (at your option) any later version.
-
 # This program is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # Lesser General Public License for more details.
-
 # You should have received a copy of the GNU Lesser General Public
 # License along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
-
 """JSON (de)serialization facilities."""
 
+import collections
+import io
 import sys
-import StringIO
 import unittest
 
-import wrappers
+from . import wrappers
+
 
 def from_json(str):
     """Return a python object representing the json value in str."""
@@ -36,7 +33,7 @@ def from_json(str):
 
 def to_json(obj):
     """Return a json string representing the python object obj."""
-    i = StringIO.StringIO()
+    i = io.StringIO()
     w = Writer(i, encoding='UTF-8')
     w.write_value(obj)
     return i.getvalue()
@@ -74,7 +71,7 @@ class Writer(object):
     def unflushed_write_value(self, value):
         if hasattr(value, '__to_json__'):
             self.unflushed_write_value(value.__to_json__())
-        elif isinstance(value, unicode):
+        elif isinstance(value, str):
             self.s.write('"')
             for c in value:
                 if c == '\b':
@@ -92,7 +89,8 @@ class Writer(object):
                 elif c == '\\':
                     self.s.write(r'\\')
                 elif c >= ' ' and c <= '~':
-                    self.s.write(c.encode('ascii'))
+                    # self.s.write(c.encode('ascii'))
+                    self.s.write(c)
                 elif c > '~':
                     self.s.write(r'\u%04x' % ord(c))
                 else:
@@ -102,17 +100,17 @@ class Writer(object):
             self.unflushed_write_value(value.decode(self.encoding or sys.getdefaultencoding()))
         elif isinstance(value, bool):
             self.s.write(value and 'true' or 'false')
-        elif isinstance(value, int) or isinstance(value, float) or isinstance(value, long):
+        elif isinstance(value, int) or isinstance(value, float) or isinstance(value, int):
             r = repr(value)
             if r[-1] == 'L':
                 r = r[:-1]
             self.s.write(r)
         elif value == None:
             self.s.write('null')
-        elif hasattr(value, '__iter__'):
-            if hasattr(value,'iteritems'):
+        elif isinstance(value, collections.Iterable):
+            if isinstance(value, collections.Mapping):
                 self.s.write('{')
-                for n, (k, v) in enumerate(value.iteritems()):
+                for n, (k, v) in enumerate(value.items()):
                     if (n > 0):
                         self.s.write(',')
                     self.unflushed_write_value(k)
@@ -171,20 +169,20 @@ class Tokenizer(object):
 
     def _read_space(self):
         while self.s.peek() in ' \t\r\n':
-            self.s.next()
+            next(self.s)
 
     def _read_pair(self):
         self.pair_begin()
         self._read_string()
         self._read_space()
-        self._assert(self.s.next(), ':')
+        self._assert(next(self.s), ':')
         self._read_space()
         self._read_value()
         self.pair_end()
 
     def _read_object(self):
         self.object_begin()
-        self._assert(self.s.next(), '{')
+        self._assert(next(self.s), '{')
         self._read_space()
         if self.s.peek() != '}':
             while True:
@@ -192,14 +190,14 @@ class Tokenizer(object):
                 self._read_space()
                 if self.s.peek() == '}':
                     break
-                self._assert(self.s.next(), ',')
+                self._assert(next(self.s), ',')
                 self._read_space()
-        self._assert(self.s.next(), '}')
+        self._assert(next(self.s), '}')
         self.object_end()
 
     def _read_array(self):
         self.array_begin()
-        self._assert(self.s.next(), '[')
+        self._assert(next(self.s), '[')
         self._read_space()
         if self.s.peek() != ']':
             while True:
@@ -207,35 +205,35 @@ class Tokenizer(object):
                 self._read_space()
                 if self.s.peek() == ']':
                     break
-                self._assert(self.s.next(), ',')
+                self._assert(next(self.s), ',')
                 self._read_space()
-        self._assert(self.s.next(), ']')
+        self._assert(next(self.s), ']')
         self.array_end()
 
     def _read_char(self):
-        c = self.s.next()
+        c = next(self.s)
         if c == '\\':
-            c = self.s.next()
+            c = next(self.s)
             if c == 'b': c = '\b'
             elif c == 'f': c = '\f'
             elif c == 'n': c = '\n'
             elif c == 'r': c = '\r'
             elif c == 't': c = '\t'
             elif c == 'u':
-                d1 = self.s.next()
-                d2 = self.s.next()
-                d3 = self.s.next()
-                d4 = self.s.next()
-                c = unichr(int(d1+d2+d3+d4, 16))
+                d1 = next(self.s)
+                d2 = next(self.s)
+                d3 = next(self.s)
+                d4 = next(self.s)
+                c = chr(int(d1+d2+d3+d4, 16))
             else: self._assert(c, '"\\/')
         self.char(c)
 
     def _read_string(self):
         self.string_begin()
-        self._assert(self.s.next(), '"')
+        self._assert(next(self.s), '"')
         while self.s.peek() != '"':
             self._read_char()
-        self._assert(self.s.next(), '"')
+        self._assert(next(self.s), '"')
         self.string_end()
 
     def _read_number(self):
@@ -247,50 +245,50 @@ class Tokenizer(object):
         # next/peek again and it will be re-raised.
         try:
             if self.s.peek() == '-':
-                self.char(self.s.next())
+                self.char(next(self.s))
             if self.s.peek() == '0':
-                self.char(self.s.next())
+                self.char(next(self.s))
             else:
                 self._assert(self.s.peek(), '123456789')
-                self.char(self.s.next())
+                self.char(next(self.s))
                 while self.s.peek() in '0123456789':
-                    self.char(self.s.next())
+                    self.char(next(self.s))
             if self.s.peek() == '.':
-                self.char(self.s.next())
+                self.char(next(self.s))
                 self._assert(self.s.peek(), '0123456789')
                 while self.s.peek() in '0123456789':
-                    self.char(self.s.next())
+                    self.char(next(self.s))
             if self.s.peek() in 'eE':
-                self.char(self.s.next())
+                self.char(next(self.s))
                 if self.s.peek() in '+-':
-                    self.char(self.s.next())
+                    self.char(next(self.s))
                 self._assert(self.s.peek(), '0123456789')
                 while self.s.peek() in '0123456789':
-                    self.char(self.s.next())
+                    self.char(next(self.s))
         except EOFError:
             pass
         self.number_end()
 
     def _read_true(self):
-        self._assert(self.s.next(), 't')
-        self._assert(self.s.next(), 'r')
-        self._assert(self.s.next(), 'u')
-        self._assert(self.s.next(), 'e')
+        self._assert(next(self.s), 't')
+        self._assert(next(self.s), 'r')
+        self._assert(next(self.s), 'u')
+        self._assert(next(self.s), 'e')
         self.true()
 
     def _read_false(self):
-        self._assert(self.s.next(), 'f')
-        self._assert(self.s.next(), 'a')
-        self._assert(self.s.next(), 'l')
-        self._assert(self.s.next(), 's')
-        self._assert(self.s.next(), 'e')
+        self._assert(next(self.s), 'f')
+        self._assert(next(self.s), 'a')
+        self._assert(next(self.s), 'l')
+        self._assert(next(self.s), 's')
+        self._assert(next(self.s), 'e')
         self.false()
 
     def _read_null(self):
-        self._assert(self.s.next(), 'n')
-        self._assert(self.s.next(), 'u')
-        self._assert(self.s.next(), 'l')
-        self._assert(self.s.next(), 'l')
+        self._assert(next(self.s), 'n')
+        self._assert(next(self.s), 'u')
+        self._assert(next(self.s), 'l')
+        self._assert(next(self.s), 'l')
         self.null()
 
     def _read_value(self):
@@ -376,20 +374,20 @@ class Reader(Tokenizer):
             return
 
 class DebugTokenizer(object):
-    def pair_begin(self): print '('; print self.state; return super(DebugTokenizer, self).pair_begin()
-    def pair_end(self): print ')'; print self.state; return super(DebugTokenizer, self).pair_end()
-    def object_begin(self): print '{'; print self.state; return super(DebugTokenizer, self).object_begin()
-    def object_end(self): print '}'; print self.state; return super(DebugTokenizer, self).object_end()
-    def array_begin(self): print '['; print self.state; return super(DebugTokenizer, self).array_begin()
-    def array_end(self): print ']'; print self.state; return super(DebugTokenizer, self).array_end()
-    def string_begin(self): print '"'; print self.state; return super(DebugTokenizer, self).string_begin()
-    def string_end(self): print '"'; print self.state; return super(DebugTokenizer, self).string_end()
-    def number_begin(self): print '<'; print self.state; return super(DebugTokenizer, self).number_begin()
-    def number_end(self): print '>'; print self.state; return super(DebugTokenizer, self).number_end()
-    def char(self, c): print repr(c); print self.state; return super(DebugTokenizer, self).char(c)
-    def true(self): print "TRUE"; print self.state; return super(DebugTokenizer, self).true()
-    def false(self): print "FALSE"; print self.state; return super(DebugTokenizer, self).false()
-    def null(self): print "NULL"; print self.state; return super(DebugTokenizer, self).null()
+    def pair_begin(self): print('('); print(self.state); return super(DebugTokenizer, self).pair_begin()
+    def pair_end(self): print(')'); print(self.state); return super(DebugTokenizer, self).pair_end()
+    def object_begin(self): print('{'); print(self.state); return super(DebugTokenizer, self).object_begin()
+    def object_end(self): print('}'); print(self.state); return super(DebugTokenizer, self).object_end()
+    def array_begin(self): print('['); print(self.state); return super(DebugTokenizer, self).array_begin()
+    def array_end(self): print(']'); print(self.state); return super(DebugTokenizer, self).array_end()
+    def string_begin(self): print('"'); print(self.state); return super(DebugTokenizer, self).string_begin()
+    def string_end(self): print('"'); print(self.state); return super(DebugTokenizer, self).string_end()
+    def number_begin(self): print('<'); print(self.state); return super(DebugTokenizer, self).number_begin()
+    def number_end(self): print('>'); print(self.state); return super(DebugTokenizer, self).number_end()
+    def char(self, c): print(repr(c)); print(self.state); return super(DebugTokenizer, self).char(c)
+    def true(self): print("TRUE"); print(self.state); return super(DebugTokenizer, self).true()
+    def false(self): print("FALSE"); print(self.state); return super(DebugTokenizer, self).false()
+    def null(self): print("NULL"); print(self.state); return super(DebugTokenizer, self).null()
     def fail(self, msg): super(DebugTokenizer, self).fail(); raise Exception(msg)
 
 class DebugReader(DebugTokenizer, Reader): pass
@@ -480,7 +478,7 @@ class TestJson(unittest.TestCase):
         self.assertRaises(self.socket.error, lambda: reader.read_value())
 
     def test_eof(self):
-        import cStringIO
+        import io
 
         obj = {'foo':1, 'bar':[1, 2]}
         io0 = self.tempfile.TemporaryFile()

@@ -23,11 +23,9 @@
 
 """A symmetric and transport agnostic JSON-RPC implementation"""
 
-from __future__ import with_statement
-
-from json import *
-from dispatcher import *
-from rpc import *
+from .json import *
+from .dispatcher import *
+from .rpc import *
 
 __all__ = ["ClientConnection",
            "Connection",

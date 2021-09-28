@@ -72,7 +72,7 @@ class WriterWrapper(object):
         data = ''.join(self.buff)
         del self.buff[:]
         self.buff_len = 0
-        if debug_write: print "write(%s)" % (repr(data),)
+        if debug_write: print("write(%s)" % (repr(data),))
         while data:
             self._wait()
             data = data[self._write(data):]
@@ -91,12 +91,12 @@ class WriterWrapper(object):
 
 class FileWriter(WriterWrapper):
     def _write(self, s):
-        self.f.write(s)
+        self.f.write(s.encode("ascii"))
         return len(s)
 
 class SocketWriter(WriterWrapper):
     def _write(self, s):
-        res = self.f.send(s)
+        res = self.f.send(s.encode("ascii"))
         return res
 
 class ReaderWrapper(object):
@@ -128,7 +128,7 @@ class ReaderWrapper(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         try:
             self._wait()
         except EOFError:
@@ -138,7 +138,7 @@ class ReaderWrapper(object):
             raise StopIteration
         else:
             if debug_read:
-                print "read(%s)" % (repr(result),)
+                print("read(%s)" % (repr(result),))
             return result
 
     def close(self):
@@ -159,11 +159,13 @@ class ReaderWrapper(object):
 
 class FileReader(ReaderWrapper):
     def _read(self):
-        return self.file.read(1)
+        return self.file.read(1).decode("utf-8")
+
 
 class SocketReader(ReaderWrapper):
     def _read(self):
-        return self.file.recv(1)
+        return self.file.recv(1).decode("utf-8")
+
 
 class ReIterator(object):
     """An iterator wrapper that provides lookahead through the peek
@@ -175,10 +177,10 @@ class ReIterator(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if self._prefix:
             return self._prefix.pop(0)
-        return self._i.next()
+        return next(self._i)
 
     def _put(self, value):
         self._prefix.append(value)
@@ -186,7 +188,7 @@ class ReIterator(object):
     def peek(self):
         try:
             if not self._prefix:
-                self._put(self._i.next())
+                self._put(next(self._i))
             return self._prefix[-1]
         except StopIteration:
             raise EOFError()

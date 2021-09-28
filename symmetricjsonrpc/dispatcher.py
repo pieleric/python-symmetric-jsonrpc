@@ -24,8 +24,6 @@
 """Facilities for managing a hirearchy of threads each providing a
 synchronous I/O interface."""
 
-from __future__ import with_statement
-
 import select
 import threading
 
@@ -63,18 +61,18 @@ class Thread(threading.Thread):
             self.parent.children.remove(self)
 
     def run(self, *arg, **kw):
-        if self.debug_thread: print "%s: BEGIN" % self.getName()
+        if self.debug_thread: print("%s: BEGIN" % self.getName())
         self.run_thread(*arg, **kw)
-        if self.debug_thread: print "%s: TEARDOWN: %s" % (self.getName(), ', '.join(child.getName() for child in self.children))
+        if self.debug_thread: print("%s: TEARDOWN: %s" % (self.getName(), ', '.join(child.getName() for child in self.children)))
         self._exit()
-        if self.debug_thread: print "%s: END" % self.getName()
+        if self.debug_thread: print("%s: END" % self.getName())
 
     def shutdown(self):
-        if self.debug_thread: print "%s: shutdown: %s" % (threading.currentThread().getName(), self.getName(),)
+        if self.debug_thread: print("%s: shutdown: %s" % (threading.currentThread().getName(), self.getName(),))
         for child in list(self.children):
             child.shutdown()
         self._shutdown = True
-        if self.debug_thread: print "%s: shutdown done: %s" % (threading.currentThread().getName(), self.getName(),)
+        if self.debug_thread: print("%s: shutdown done: %s" % (threading.currentThread().getName(), self.getName(),))
 
     def run_parent(self):
         pass
@@ -91,9 +89,9 @@ class Connection(Thread):
 
     def run_thread(self):
         for value in self.read():
-            if self.debug_dispatch: print "%s: DISPATCH: %s" % (self.getName(), value)
+            if self.debug_dispatch: print("%s: DISPATCH: %s" % (self.getName(), value))
             self.dispatch(value)
-            if self.debug_dispatch: print "%s: DISPATCH DONE: %s" % (self.getName(), value)
+            if self.debug_dispatch: print("%s: DISPATCH DONE: %s" % (self.getName(), value))
 
     def read(self):
         pass
